@@ -1,0 +1,15 @@
+"use client";
+
+import { signOut } from "next-auth/react";
+
+export function LogoutButton() {
+  return (
+    <button
+      onClick={() => signOut({ callbackUrl: "/admin/login" })}
+      className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+    >
+      Logout
+    </button>
+  );
+}
+

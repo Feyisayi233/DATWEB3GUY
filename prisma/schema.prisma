@@ -1,0 +1,182 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                    String   @id @default(cuid())
+  email                 String   @unique
+  password              String
+  role                  String   @default("user") // "admin" or "user"
+  emailVerified         Boolean  @default(false)
+  notificationPreferences String @default("{}") // JSON string
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  trackedAirdrops       TrackedAirdrop[]
+  notifications         Notification[]
+  notificationPreference NotificationPreference?
+}
+
+model Airdrop {
+  id                 String   @id @default(cuid())
+  title              String
+  slug               String   @unique
+  description        String
+  status             String   // potential, confirmed, verification, reward available
+  socialLinks        String   @default("{}") // JSON string: {twitter, discord, telegram, website}
+  startDate          DateTime?
+  endDate            DateTime?
+  rewardType         String   @default("")
+  cost               String   @default("")
+  taskType           String   @default("")
+  verificationLink   String?  @default("")
+  rewardAvailableLink String? @default("")
+  rewardDate         String   @default("TBA") // "TBA" or ISO date string
+  instructions       String   @default("")
+  eligibilityCriteria String @default("")
+  participationSteps String  @default("") // HTML content from rich text editor
+  tokenDetails       String   @default("")
+  affiliateLinks     String   @default("{}") // JSON string
+  featuredImage      String?  @default("")
+  tags               String   @default("") // comma-separated
+  published          Boolean  @default(false)
+  publishedAt        DateTime?
+  lastUpdatedAt       DateTime? // Last time published airdrop was updated
+  hasRecentUpdates   Boolean  @default(false) // True if updated within last 7 days
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  changes            AirdropChange[]
+  trackedBy          TrackedAirdrop[]
+  notifications      Notification[]
+}
+
+model NFTReview {
+  id                      String   @id @default(cuid())
+  title                   String
+  slug                    String   @unique
+  collectionName          String
+  platform                String   // Solana, Ethereum, etc.
+  reviewContent           String
+  artistSpotlight         String   @default("")
+  marketplaceTrends       String   @default("")
+  mintingGuide            String   @default("")
+  tradingTips             String   @default("")
+  featuredImage           String?  @default("")
+  tags                    String   @default("") // comma-separated
+  published               Boolean  @default(false)
+  publishedAt             DateTime?
+  // OpenSea Analytics Fields
+  openseaContractAddress  String?  @default("")
+  openseaChain            String   @default("ethereum") // ethereum, polygon, solana, etc.
+  openseaSlug             String?  @default("")
+  analyticsEnabled        Boolean  @default(false)
+  analyticsData           String   @default("{}") // JSON string of cached stats
+  analyticsLastFetched    DateTime?
+  analyticsFetchError     String?  @default("")
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model AirdropChange {
+  id          String   @id @default(cuid())
+  airdropId   String
+  airdrop     Airdrop  @relation(fields: [airdropId], references: [id], onDelete: Cascade)
+  fieldName   String   // e.g., "participationSteps", "instructions", "status"
+  oldValue    String?  // Previous value (can be null for new fields)
+  newValue    String   // New value
+  changeType  String   // "updated", "added", "removed"
+  changedAt   DateTime @default(now())
+  changedBy   String?  // Optional: admin user ID
+  
+  @@index([airdropId])
+  @@index([changedAt])
+}
+
+model Tutorial {
+  id            String   @id @default(cuid())
+  title         String
+  slug          String   @unique
+  category      String   // wallet-setup, defi, blockchain-basics
+  content       String   // markdown
+  difficulty    String   // beginner, intermediate, advanced
+  videoEmbed    String?  @default("")
+  xThreadLink   String?  @default("")
+  featuredImage String?  @default("")
+  tags          String   @default("") // comma-separated
+  published     Boolean  @default(false)
+  publishedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TrackedAirdrop {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  airdropId   String
+  airdrop     Airdrop  @relation(fields: [airdropId], references: [id], onDelete: Cascade)
+  status      String   @default("tracking") // "tracking", "in_progress", "completed", "missed"
+  trackedAt   DateTime @default(now())
+  completedAt DateTime?
+  notes       String?  @default("")
+  progress    AirdropProgress[]
+  
+  @@unique([userId, airdropId])
+  @@index([userId])
+  @@index([airdropId])
+  @@index([status])
+}
+
+model AirdropProgress {
+  id              String   @id @default(cuid())
+  trackedAirdropId String
+  trackedAirdrop  TrackedAirdrop @relation(fields: [trackedAirdropId], references: [id], onDelete: Cascade)
+  stepIndex       Int      // Which step in participationSteps (0-based)
+  stepTitle       String   // Extracted from HTML
+  completed       Boolean  @default(false)
+  completedAt     DateTime?
+  notes           String?  @default("")
+  
+  @@unique([trackedAirdropId, stepIndex])
+  @@index([trackedAirdropId])
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  airdropId   String?  // Optional, null for general notifications
+  airdrop     Airdrop? @relation(fields: [airdropId], references: [id], onDelete: Cascade)
+  type        String   // "deadline_7d", "deadline_3d", "deadline_1d", "status_change", "new_airdrop", "update"
+  title       String
+  message     String
+  sentAt      DateTime @default(now())
+  readAt      DateTime?
+  emailSent   Boolean  @default(false)
+  
+  @@index([userId])
+  @@index([airdropId])
+  @@index([readAt])
+  @@index([sentAt])
+}
+
+model NotificationPreference {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailEnabled            Boolean  @default(true)
+  deadlineReminders       Boolean  @default(true)
+  daysBeforeDeadline      String   @default("7,3,1") // Comma-separated days
+  statusChangeNotifications Boolean @default(true)
+  newAirdropNotifications Boolean  @default(false)
+  updateNotifications     Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
